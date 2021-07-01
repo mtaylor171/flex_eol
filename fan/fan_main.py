@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import time
 import pigpio
+import numpy as np 
 
 class reader:
    """
@@ -73,6 +74,19 @@ class reader:
 				if self._period < 2000000000:
 					self._period += (self._watchdog * 1000)
 
+	def runtime_settings(self, duration, SAMPLE_TIME):
+		if duration == "i":
+			duration = np.inf
+		else:
+			try:
+				duration = int(duration)
+			except ValueError:
+				print('Invalid Duration Type')
+				return -1
+		self.duration = duration
+
+		return 0, self.duration
+
 	def RPM(self):
 		"""
 		Returns the RPM.
@@ -99,7 +113,8 @@ if __name__ == "__main__":
 	import read_RPM
 
 	RPM_GPIO = 4
-	RUN_TIME = 60.0
+
+	resp, RUN_TIME = reader.runtime_settings(input("Enter Duration in seconds (i for infinite): "))
 	SAMPLE_TIME = 2.0
 
 	pi = pigpio.pi()
