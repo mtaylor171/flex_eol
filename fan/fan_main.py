@@ -1,12 +1,14 @@
 import time
 import pigpio
+import sys
 
 class reader:
 
-    def __init__(self, pi, gpio, pulses_per_rev = 1.0, weighting = 0.0, min_RPM = 5.0):
+    def __init__(self, pi, gpio, pwm, pulses_per_rev = 1.0, weighting = 0.0, min_RPM = 5.0):
 
         self.pi = pi
         self.gpio = gpio
+        self.pwm = pwm
         self.pulses_per_rev = pulses_per_rev
 
         if min_RPM > 1000.0:
@@ -52,17 +54,23 @@ class reader:
             if self._period is not None:
                 if self._period  < 2000000000:
                     self._period += (self._watchdog * 1000)
-                
-
-
+        
+    def PWM(self, duty):
+        self.pi.hardware_PWM(self.pwm, 25000, duty * 10000)
+        
     def RPM(self):
 
         RPM = 0.0
         if self._period is not None:
-            RPM = 600000000.0 / (self._period * self.pulses_per_rev)
+            RPM = 60000000.0 / (self._period * self.pulses_per_rev)
             if RPM < self.min_RPM:
                 RPM = 0.0
         return RPM
+
+    def cancel(self):
+        self.pi.hardware_PWM(self.pwm, 25000, 0)
+        self.pi.set_watchdog(self.gpio, 0)
+        self._cb.cancel() 
 
 
 if __name__ == "__main__":
@@ -72,23 +80,35 @@ if __name__ == "__main__":
     import fan_main
 
     RPM_GPIO = 4
-    RUN_TIME = 60.0
-    SAMPLE_TIME = 2.0
+    PWM_GPIO = 19
+    RUN_TIME = int(input("Enter Duration: "))
+    DUTY = int(input("Enter Duty Cycle %: "))
+    SAMPLE_TIME = 0.5
 
     pi = pigpio.pi()
 
-    p = fan_main.reader(pi, RPM_GPIO)
+    p = fan_main.reader(pi, RPM_GPIO, PWM_GPIO)
+    
+    p.PWM(DUTY)
 
     start = time.time()
 
     while (time.time() - start) < RUN_TIME:
+        try:
         
-        time.sleep(SAMPLE_TIME)
+            time.sleep(SAMPLE_TIME)
 
-        RPM = p.RPM()
+            RPM = p.RPM()
 
-        print("RPM = {}".format(int(RPM+0.5)))
+            print("RPM = {}".format(int(RPM+0.5)))
+        
+        except KeyboardInterrupt:
+            p.cancel()
+            sys.exit()
+        
+        finally:
+            pass
 
     p.cancel()
 
-    p.stop()
+    #p.stop()
