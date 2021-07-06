@@ -241,7 +241,17 @@ def start_sequence():
 		sys.exit()
 
 def run_motor(MC):
+	temp_data = np.uint32([0,0,0,0,0,0,0,0,0])
+	adc_reading = 0x0
+    index = 0x0
+    pwm_counter = 0
+
 	resp, msg = MC.initialize()
+	if not resp:
+		print(msg)
+		return -1
+
+	MC.analog_in_initial_send()
 
 def run_main():
 	MOTOR_DURATION_MC1 = 10
@@ -256,6 +266,7 @@ def run_main():
 	
 	while(1):
 		if input("Once motor is connected please press 'y' and ENTER: ").lower() == 'y':
+			time.sleep(1)
 			break
 		else:
 			print("\n\n*****************************\n")
@@ -266,15 +277,15 @@ def run_main():
 	print("\n\n*****************************\n")
 	print("\nCommunicating with board, please wait...\n")
 
-	resp, msg = run_motor(MC_1)
-	MC_1.motor_results(resp, msg)
-	resp, msg = run_motor(MC_1)
-	MC_1.motor_results(resp, msg)
+	resp1, msg1 = run_motor(MC_1)
+	resp2, msg2 = run_motor(MC_2)
+	MC_1.motor_results(resp1, msg1)
+	MC_2.motor_results(resp2, msg2)
 
 	while(1):
 		next_step = input("Press 'c' and ENTER to continue to next motor, or press 'x' and ENTER to exit program: ").lower()
 		if next_step == 'y':
-			time.sleep(3)
+			time.sleep(1)
 			break
 		elif next_step == 'x':
 			return 0

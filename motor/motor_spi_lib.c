@@ -240,6 +240,8 @@ void setAnalogOut(uint8_t pin, uint16_t milivolts);
 uint16_t getAnalogIn(uint8_t pins);
 
 
+int motor_ping();
+
 
 uint32_t elapsed_time();
 
@@ -331,6 +333,18 @@ uint32_t elapsed_time(){
  * Parameters:
  * 	spiBuffer[] = spi buffer
  */
+
+int motor_ping(){
+	setAD5592Ch(1);
+	bcm2835_delay(10);
+	spiComs((DRV8343_IC1 << 8) | DRV8343_IC1_CONTROL);
+	if(spiIn[1] == 0x20){
+		return 0
+	}
+	else{
+		return 1
+	}
+}
 
 int initialize_motor(){
 	int spi_timeout_counter = 0;
