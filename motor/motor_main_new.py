@@ -13,69 +13,30 @@ import RPi.GPIO as GPIO
 import os
 import pigpio
 
-
 ACTIVE_CHANNELS = 8
-
-x_len = 200
-y_range = [0, 3500]
-
-filename = str(datetime.datetime.now())
-file = open(filename, 'w', newline='')
+PWM_PIN = 19            # GPIO pin 19 for Motor PWM control
+MOTOR_EN_PIN = 15       # GPIO pin 15 for Motor enable
 
 FILE_OUTPUT_NAME = str(datetime.datetime.now())
-
-fig, axs = plt.subplots(4)
-fig.suptitle('Motor Health')
-plt.xlabel('Time (us)')
-
-CHANNELS = 8
-pwm_current = 0
-position_cntr = 0
-
-code_count = [[],[],[]]
-last_position = 0
-position_hold_time = 0
-freq_count = [[],[]]
-
-
-data = [[],[],[],[],[],[],[],[],[]]
-data_single_revolution = [[],[],[],[]]
-
-x = []
-v = []
-r = []
-
-
-kDt = 0.5
-kAlpha = 0.01
-kBeta = 0.0001
-# gets the current time in the form of microseconds - need to revisit this
-def get_us():
-    now = datetime.datetime.now()
-    return (now.minute*60000000)+(now.second*1000000)+(now.microsecond)
-
-# returns the elapsed time by subtracting the timestamp provided by the current time 
-def get_elapsed_us(timestamp):
-    temp = get_us()
-    return (temp - timestamp)
+file = open("/home/pi/Documents/" + FILE_OUTPUT_NAME, 'w', newline='')
 
 class MotorController(object):
-    SO_FILE = os.path.dirname(os.path.realpath(__file__)) + "/ad5592_spi_read.so"
+    SO_FILE = os.path.dirname(os.path.realpath(__file__)) + "/motor_spi_lib.so"
     C_FUNCTIONS = CDLL(SO_FILE)
     INITIAL_US = get_us()
     
-    def __init__(self, pwm_pin, motor_pin, mode = GPIO.BOARD, freq = 25000, warnings = False):
+    def __init__(self, pwm_pin, motor_pin, motor_duration, pwm_target, mode = GPIO.BOARD, freq = 25000, warnings = False):
         GPIO.setwarnings(warnings)
         GPIO.setmode(mode)
         GPIO.setup(motor_pin, GPIO.OUT)
         self.pwm_pin = pwm_pin
         self.motor_pin = motor_pin
         self.pi = pigpio.pi()
+        self.motor_duration = motor_duration
+        self.pwm_target = pwm_target
         
         ## Default values
         self.pwm_current = 0
-        self.pwm_target = 0
-        self.duration = ""
         self.position_hold_time = 0
         self.position_counter = 0
         self.data = []
@@ -91,8 +52,8 @@ class MotorController(object):
 
 
     def initialize(self):
-    	print("***********************************")
-        print("Initializing spi...")
+    	print("\n\n***********************************\n\n")
+        print("Communicating with motor board...\n")
         msg = ""
         self.pi.hardware_PWM(19, 0, 0)
         GPIO.output(self.motor_pin, 1)
@@ -102,13 +63,13 @@ class MotorController(object):
             ## TODO Raise exception here
             msg = "ERROR: Initialize Failed."
             return 0, msg
+    	if 
+        #if input("Would you like to view the registers? (y/n): ").lower() == 'y':
+            #self._read_registers()
 
-        if input("Would you like to view the registers? (y/n): ").lower() == 'y':
-            self._read_registers()
-
-            if(input("\nAre Registers correct? (y/n): ").lower() != 'y'):
-                msg = "Registers Not Selected to be Correct."
-                return 0, msg
+            #if(input("\nAre Registers correct? (y/n): ").lower() != 'y'):
+                #msg = "Registers Not Selected to be Correct."
+                #return 0, msg
 
         if not self.C_FUNCTIONS.initialize_adc():
             print("ADC Initialized Successfuly")
@@ -117,22 +78,6 @@ class MotorController(object):
             return 0, msg
 
         return 1, "Everything Looks Good."
-
-
-    def pwm_settings(self, duration, pwm_target):
-        if duration == "i":
-            duration = np.inf
-        else:
-            try:
-                duration = int(duration)
-            except ValueError:
-                print("invalid duration type")
-                return -1
-
-        self.duration = duration
-        self.pwm_target = int(pwm_target)
-
-        return 0
     
     def analog_in_initial_send(self):
         self.C_FUNCTIONS.getAnalogInAll_InitialSend()
@@ -144,6 +89,12 @@ class MotorController(object):
             self.pwm_current = self.pwm_current + 1
             print("PWM: {}".format(self.pwm_current))
         self.pi.hardware_PWM(19, 25000, pwm_current * 10000)
+
+    def bcm2835_init_spi(self):
+    	self.C_FUNCTIONS.AD552_Init()
+
+    def bcm2835_motor_ping(self):
+    	return self.C_FUNCTIONS.motor_ping()
 
     def get_analog_data(self):
         return self.C_FUNCTIONS.getAnalogInAll_Receive()
@@ -216,6 +167,17 @@ class MotorController(object):
         return 0
 
 
+    def motor_results(self, resp, msg):
+    print("\n\n-----------------------------\n")
+	print("-----------------------------\n")
+	if not resp:
+		print("MOTOR FAILED\n")
+		print(msg)
+	else:
+		print("MOTOR PASSED\n")
+	print("\n\n-----------------------------\n")
+	print("-----------------------------\n")
+
     def _read_registers(self):
     # Reads all registers on DRV8343 and prints them
         for i in range(19):
@@ -255,89 +217,83 @@ class MotorController(object):
         #TODO: Implement Function here
         return 0
 
+def start_sequence():
+	print("*****************************\n\n")
+	print(FILE_OUTPUT_NAME)
+	print("\n\nNURO MOTOR TESTING\n\n")
+	print("*****************************\n\n")
 
-# Processes the raw ADC data by multiplying by factor of 4096/5000 = 0.819
-# Also extracts the index from data frame
-# Returns both of these
-def data_process(data):
-    adc_reading = int((data & 0x0FFF) / 0.819)
-    index = ((data >> 12) & 0x7)
-    return adc_reading, index
+	MC_start = MotorController(PWM_PIN, MOTOR_EN_PIN, 0, 0)
 
-# Graphs the current data. This is currently screwed up
-def graph_data():
-    #filter_data(freq_count[1])
-    axs[0].plot(freq_count[0], x)
-    axs[1].plot(data[0], data[4])
-    axs[2].plot(data[0], data[5])
-    axs[3].plot(data[0], data[6])
-    plt.show()
+	MC_start.bcm2835_init_spi()
 
-# This is the main script which commands the pwm, adc data, and 
-# The while loop will keep running until time elapses, a keyboard interrupt, or the motor stalls
+	print("Waiting on motor board to power up...\n")
+
+	try:
+		while(MC_start.bcm2835_motor_ping()):
+			pass
+
+		print("\n*****************************\n")
+		print("Motor Board Connected!")
+		print("\n*****************************\n")
+
+	except KeyboardInterrupt:
+		sys.exit()
+
+def run_motor(MC):
+	resp, msg = MC.initialize()
 
 def run_main():
-    PWM_PIN = 19
-    MOTOR_EN_PIN = 15
-    
-    MC = MotorController(PWM_PIN, MOTOR_EN_PIN)
-    resp, msg = MC.initialize()
-    print("***********************************")
+	MOTOR_DURATION_MC1 = 10
+	MOTOR_DURATION_MC2 = 10
+	MOTOR_PWM_TARGET_MC1 = 5
+	MOTOR_PWM_TARGET_MC2 = 85
 
-    if not resp:
-        print(msg)
-        return -1
-    
-    resp = MC.pwm_settings(
-        input("Enter sample duration (type 'i' for inifinite): "),
-        input("Enter target duty cycle % (0-100):"))
+	MC_1 = MotorController(PWM_PIN, MOTOR_EN_PIN, MOTOR_DURATION_MC1, MOTOR_PWM_TARGET_MC1)
+	MC_2 = MotorController(PWM_PIN, MOTOR_EN_PIN, MOTOR_DURATION_MC2, MOTOR_PWM_TARGET_MC2)
 
-    if not resp:
-        print("PWM Settings incorrect. Exiting")
-        return -1
+	print("\n\n\n\n----PLEASE CONNECT MOTOR----\n\n\n")
+	
+	while(1):
+		if input("Once motor is connected please press 'y' and ENTER: ").lower() == 'y':
+			break
+		else:
+			print("\n\n*****************************\n")
+			print("Incorrect character entered. ")
+			print("\n\n*****************************\n")
+			pass
 
-    print("***********************************")
-    temp_data = np.uint32([0,0,0,0,0,0,0,0,0])
-    adc_reading = 0x0
-    index = 0x0
-    pwm_counter = 0
-    MC.analog_in_initial_send()                                         # Sends initial command to ADC to start recording all channels repeatedly
-    position_hold_time = get_us()										# Gets initial timestamp for position time tracking
+	print("\n\n*****************************\n")
+	print("\nCommunicating with board, please wait...\n")
 
-    while(1):
-            if((pwm_counter % 1000) == 0):
-                MC.pwm_control()											# Adjusts PWM for ramp-up
-            pwm_counter = pwm_counter + 1								# Counter allows for a gradual ramp-up
-            for i in range(0, ACTIVE_CHANNELS):
-                data_16bit = MC.get_analog_data() 
-                adc_reading, index = data_process(data_16bit)
-                temp_data[index+1] = adc_reading
-                data[index+1].append(temp_data[index+1])
-            temp_data[0] = get_elapsed_us(MC.INITIAL_US)
-            data[0].append(temp_data[0])
-            #print('Time Elapsed: {}'.format(temp_data[0]))
-            writer = csv.writer(file)
-            writer.writerow(temp_data)
-        try:
-            resp = MC.health_check(temp_data)
-            if not resp:
-                MC.shutdown()
-                raise Exception("Health Check Failed")
-            if(MC.duration != np.inf):
-                if(temp_data[0] >= MC.duration * 1000000):
-                    MC.analog_terminate()
-                    MC.rampdown()
-        except KeyboardInterrupt:
+	resp, msg = run_motor(MC_1)
+	MC_1.motor_results(resp, msg)
+	resp, msg = run_motor(MC_1)
+	MC_1.motor_results(resp, msg)
 
-            MC.analog_terminate()
-            MC.rampdown()
-
-        finally:
-            pass
+	while(1):
+		next_step = input("Press 'c' and ENTER to continue to next motor, or press 'x' and ENTER to exit program: ").lower()
+		if next_step == 'y':
+			time.sleep(3)
+			break
+		elif next_step == 'x':
+			return 0
+		else:
+			print("\n\n*****************************\n")
+			print("Incorrect character entered. ")
+			print("\n\n*****************************\n")
+			pass
 
 
-
+def end_sequence():
 
 
 if __name__ == "__main__":
-    run_main()
+	start_sequence()
+
+	while(1):
+		if run_main():
+			end_sequence()
+		else:
+			print("This program will be shutting down in 5 seconds")
+			time.sleep(5)

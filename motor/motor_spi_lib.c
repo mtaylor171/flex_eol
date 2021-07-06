@@ -18,18 +18,18 @@
  */
 #define DRV8343_IC1_CONTROL		0x20 	/* 1x PWM mode */
 #define DRV8343_IC2_CONTROL 	0x40 	/* OVT latch fault, OLP delay 5ms, Short delay 2ms */
-#define DRV8343_IC3_CONTROL 	0xCC 	/* IDRIVE 
-#define DRV8343_IC4_CONTROL 	0xCC
-#define DRV8343_IC5_CONTROL 	0xCC
-#define DRV8343_IC6_CONTROL 	0x99
-#define DRV8343_IC7_CONTROL 	0x99
-#define DRV8343_IC8_CONTROL 	0x99
-#define DRV8343_IC9_CONTROL  	0x2F
-#define DRV8343_IC10_CONTROL	0x61 
-#define DRV8343_IC11_CONTROL 	0x00 
-#define DRV8343_IC12_CONTROL 	0x2A 
-#define DRV8343_IC13_CONTROL	0x7F
-#define DRV8343_IC14_CONTROL 	0x00
+#define DRV8343_IC3_CONTROL 	0xCC 	/* IDRIVE 735mA */
+#define DRV8343_IC4_CONTROL 	0xCC	/* IDRIVE 735mA */
+#define DRV8343_IC5_CONTROL 	0xCC	/* IDRIVE 735mA */
+#define DRV8343_IC6_CONTROL 	0x99	/* VDS 0.75V */
+#define DRV8343_IC7_CONTROL 	0x99	/* VDS 0.75A */
+#define DRV8343_IC8_CONTROL 	0x99	/* VDS 0.75A */
+#define DRV8343_IC9_CONTROL  	0x2F 	/* T_retry 4ms, dead_time 1us, T_drive 3us */
+#define DRV8343_IC10_CONTROL	0x61 	/* Charge UVLO enabled, gate drive fault enabled, OCP deglitch 4.75us */
+#define DRV8343_IC11_CONTROL 	0x00 	/* Overtemp not reported in nFault, OCP causes latched fault */
+#define DRV8343_IC12_CONTROL 	0x2A 	/* 20 V/V current sense amplifier gain */
+#define DRV8343_IC13_CONTROL	0x7F	/* Sense amplifier Vref/2, sense OCP 1V */
+#define DRV8343_IC14_CONTROL 	0x00 	/* Enable sense overcurrent fault, normal current sense amplifier operation */
 
 
 /**

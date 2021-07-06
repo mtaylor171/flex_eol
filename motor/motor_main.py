@@ -16,6 +16,9 @@ import pigpio
 
 ACTIVE_CHANNELS = 8
 
+PWM_PIN = 19            # GPIO pin 19 for Motor PWM control
+MOTOR_EN_PIN = 15       # GPIO pin 15 for Motor enable
+
 x_len = 200
 y_range = [0, 3500]
 
@@ -60,7 +63,7 @@ def get_elapsed_us(timestamp):
     return (temp - timestamp)
 
 class MotorController(object):
-    SO_FILE = os.path.dirname(os.path.realpath(__file__)) + "/ad5592_spi_read.so"
+    SO_FILE = os.path.dirname(os.path.realpath(__file__)) + "/motor_spi_lib.so"
     C_FUNCTIONS = CDLL(SO_FILE)
     INITIAL_US = get_us()
     
@@ -120,15 +123,6 @@ class MotorController(object):
 
 
     def pwm_settings(self, duration, pwm_target):
-        if duration == "i":
-            duration = np.inf
-        else:
-            try:
-                duration = int(duration)
-            except ValueError:
-                print("invalid duration type")
-                return -1
-
         self.duration = duration
         self.pwm_target = int(pwm_target)
 
@@ -277,11 +271,13 @@ def graph_data():
 # The while loop will keep running until time elapses, a keyboard interrupt, or the motor stalls
 
 def run_main():
-    PWM_PIN = 19
-    MOTOR_EN_PIN = 15
+
+    MODE_1_DURATION = 10    # Time that motor will run in Mode 1
+    MODE_2_DURATION = 10    # Time that motor will run in Mode 2
     
-    MC = MotorController(PWM_PIN, MOTOR_EN_PIN)
-    resp, msg = MC.initialize()
+    MC_1 = MotorController(PWM_PIN, MOTOR_EN_PIN)
+    MC_2 = MotorController(PWM_PIN, MOTOR_EN_PIN)
+    resp, msg = MC_1.initialize()
     print("***********************************")
 
     if not resp:
@@ -305,8 +301,8 @@ def run_main():
     position_hold_time = get_us()										# Gets initial timestamp for position time tracking
 
     while(1):
-            if((pwm_counter % 1000) == 0):
-                MC.pwm_control()											# Adjusts PWM for ramp-up
+            if((pwm_counter % 1000) == 0):                              # Ramps up PWM
+                MC.pwm_control()
             pwm_counter = pwm_counter + 1								# Counter allows for a gradual ramp-up
             for i in range(0, ACTIVE_CHANNELS):
                 data_16bit = MC.get_analog_data() 
@@ -315,7 +311,6 @@ def run_main():
                 data[index+1].append(temp_data[index+1])
             temp_data[0] = get_elapsed_us(MC.INITIAL_US)
             data[0].append(temp_data[0])
-            #print('Time Elapsed: {}'.format(temp_data[0]))
             writer = csv.writer(file)
             writer.writerow(temp_data)
         try:
@@ -336,8 +331,6 @@ def run_main():
             pass
 
 
-
-
-
 if __name__ == "__main__":
+
     run_main()
