@@ -272,11 +272,9 @@ def graph_data():
 
 def run_main():
 
-    MODE_1_DURATION = 10    # Time that motor will run in Mode 1
-    MODE_2_DURATION = 10    # Time that motor will run in Mode 2
+    DURATION = 10    # Time that motor will run in Mode 1
     
-    MC_1 = MotorController(PWM_PIN, MOTOR_EN_PIN)
-    MC_2 = MotorController(PWM_PIN, MOTOR_EN_PIN)
+    MC = MotorController(PWM_PIN, MOTOR_EN_PIN)
     resp, msg = MC_1.initialize()
     print("***********************************")
 

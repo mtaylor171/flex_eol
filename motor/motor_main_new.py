@@ -20,6 +20,31 @@ MOTOR_EN_PIN = 15       # GPIO pin 15 for Motor enable
 FILE_OUTPUT_NAME = str(datetime.datetime.now())
 file = open("/home/pi/Documents/" + FILE_OUTPUT_NAME, 'w', newline='')
 
+#fig, axs = plt.subplots(4)
+#fig.suptitle('Motor Health')
+#plt.xlabel('Time (us)')
+
+data = [[],[],[],[],[],[],[],[],[]]
+data_single_revolution = [[],[],[],[]]
+
+x = []
+v = []
+r = []
+
+
+kDt = 0.5
+kAlpha = 0.01
+kBeta = 0.0001
+
+def get_us():
+    now = datetime.datetime.now()
+    return (now.minute*60000000)+(now.second*1000000)+(now.microsecond)
+
+# returns the elapsed time by subtracting the timestamp provided by the current time 
+def get_elapsed_us(timestamp):
+    temp = get_us()
+    return (temp - timestamp)
+
 class MotorController(object):
     SO_FILE = os.path.dirname(os.path.realpath(__file__)) + "/motor_spi_lib.so"
     C_FUNCTIONS = CDLL(SO_FILE)
@@ -240,6 +265,8 @@ def start_sequence():
 	except KeyboardInterrupt:
 		sys.exit()
 
+
+
 def run_motor(MC):
 	temp_data = np.uint32([0,0,0,0,0,0,0,0,0])
 	adc_reading = 0x0
@@ -253,9 +280,44 @@ def run_motor(MC):
 
 	MC.analog_in_initial_send()
 
+    MC.position_hold_time = get_us()
+
+    while(1):
+            if((pwm_counter % 1000) == 0):                              # Ramps up PWM
+                MC.pwm_control()
+            pwm_counter = pwm_counter + 1                               # Counter allows for a gradual ramp-up
+            for i in range(0, ACTIVE_CHANNELS):
+                data_16bit = MC.get_analog_data() 
+                adc_reading, index = data_process(data_16bit)
+                temp_data[index+1] = adc_reading
+                data[index+1].append(temp_data[index+1])
+            temp_data[0] = get_elapsed_us(MC.INITIAL_US)
+            data[0].append(temp_data[0])
+            writer = csv.writer(file)
+            writer.writerow(temp_data)
+        try:
+            resp = MC.health_check(temp_data)
+            if not resp:
+                MC.shutdown()
+                raise Exception("Health Check Failed")
+            if(MC.duration != np.inf):
+                if(temp_data[0] >= MC.duration * 1000000):
+                    MC.analog_terminate()
+                    MC.rampdown()
+        except KeyboardInterrupt:
+
+            MC.analog_terminate()
+            MC.rampdown()
+
+        finally:
+            pass
+
+
+
 def run_main():
 	MOTOR_DURATION_MC1 = 10
 	MOTOR_DURATION_MC2 = 10
+
 	MOTOR_PWM_TARGET_MC1 = 5
 	MOTOR_PWM_TARGET_MC2 = 85
 
@@ -308,3 +370,4 @@ if __name__ == "__main__":
 		else:
 			print("This program will be shutting down in 5 seconds")
 			time.sleep(5)
+            break
