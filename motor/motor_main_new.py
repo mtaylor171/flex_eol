@@ -20,17 +20,8 @@ MOTOR_EN_PIN = 15       # GPIO pin 15 for Motor enable
 FILE_OUTPUT_NAME = str(datetime.datetime.now())
 file = open("/home/pi/Documents/" + FILE_OUTPUT_NAME, 'w', newline='')
 
-#fig, axs = plt.subplots(4)
-#fig.suptitle('Motor Health')
-#plt.xlabel('Time (us)')
-
 data = [[],[],[],[],[],[],[],[],[]]
 data_single_revolution = [[],[],[],[]]
-
-x = []
-v = []
-r = []
-
 
 kDt = 0.5
 kAlpha = 0.01
@@ -86,7 +77,7 @@ class MotorController(object):
         
         if _self_check:
             ## TODO Raise exception here
-            msg = "ERROR: Initialize Failed."
+            msg = "ERROR: Could not communicate with motor board. Please disconnect motor."
             return 0, msg
     	if 
         #if input("Would you like to view the registers? (y/n): ").lower() == 'y':
@@ -99,7 +90,7 @@ class MotorController(object):
         if not self.C_FUNCTIONS.initialize_adc():
             print("ADC Initialized Successfuly")
         else:
-            msg = "ERROR: Initialize Failed."
+            msg = "ERROR: ADC Initialize Failed. Please Disconnect motor."
             return 0, msg
 
         return 1, "Everything Looks Good."
@@ -174,13 +165,14 @@ class MotorController(object):
 
     def rampdown(self):
         print("Starting rampdown...")
-        for duty in range(self.pwm_current, -1, -1):
-            self.pi_pwm.ChangeDutyCycle(duty)
+        for duty in range(self.pwm_current, 5, -1):
+            self.pi.hardware_PWM(19, 25000, duty * 10000)
             print("PWM: {}".format(duty))
-            time.sleep(0.5)
-        GPIO.output(self.motor_pin, 0)
+            time.sleep(0.2)
+        self.pi.hardware_PWM(19, 0, 0)
+        #GPIO.output(self.motor_pin, 0)
         # graph_data()
-        return 0
+        #return 0
 
     def shutdown(self):
     # This occurs when there is a danger event like a stall or overcurrent
@@ -189,7 +181,7 @@ class MotorController(object):
         self.pi.hardware_PWM(19, 0, 0)
         GPIO.output(self.motor_pin, 0)
         # graph_data()
-        return 0
+        #return 0
 
 
     def motor_results(self, resp, msg):
@@ -263,9 +255,13 @@ def start_sequence():
 		print("\n*****************************\n")
 
 	except KeyboardInterrupt:
-		sys.exit()
+		end_sequence()
 
 
+def end_sequence():
+    self.pi.hardware_PWM(19, 0, 0)
+    GPIO.output(self.motor_pin, 0)
+	sys.exit()
 
 def run_motor(MC):
 	temp_data = np.uint32([0,0,0,0,0,0,0,0,0])
@@ -275,7 +271,7 @@ def run_motor(MC):
 
 	resp, msg = MC.initialize()
 	if not resp:
-		print(msg)
+		print(msg + "\n")
 		return -1
 
 	MC.analog_in_initial_send()
@@ -299,15 +295,16 @@ def run_motor(MC):
             resp = MC.health_check(temp_data)
             if not resp:
                 MC.shutdown()
-                raise Exception("Health Check Failed")
-            if(MC.duration != np.inf):
-                if(temp_data[0] >= MC.duration * 1000000):
-                    MC.analog_terminate()
-                    MC.rampdown()
+                return -1
+            if(temp_data[0] >= MC.duration * 1000000):
+                MC.analog_terminate()
+                MC.rampdown()
+                return 1
         except KeyboardInterrupt:
 
             MC.analog_terminate()
             MC.rampdown()
+            return -1
 
         finally:
             pass
@@ -340,7 +337,15 @@ def run_main():
 	print("\nCommunicating with board, please wait...\n")
 
 	resp1, msg1 = run_motor(MC_1)
+	if resp1 < 0:
+		print(msg + "\n")
+		print("\n\nRestarting test program...\n\n")
+		return -1
 	resp2, msg2 = run_motor(MC_2)
+	if resp2 < 0:
+		print(msg + "\n")
+		print("\n\nRestarting test program...\n\n")
+		return -1
 	MC_1.motor_results(resp1, msg1)
 	MC_2.motor_results(resp2, msg2)
 
@@ -348,7 +353,7 @@ def run_main():
 		next_step = input("Press 'c' and ENTER to continue to next motor, or press 'x' and ENTER to exit program: ").lower()
 		if next_step == 'y':
 			time.sleep(1)
-			break
+			return 1
 		elif next_step == 'x':
 			return 0
 		else:
@@ -362,12 +367,20 @@ def end_sequence():
 
 
 if __name__ == "__main__":
-	start_sequence()
-
 	while(1):
-		if run_main():
-			end_sequence()
-		else:
-			print("This program will be shutting down in 5 seconds")
-			time.sleep(5)
-            break
+		start_sequence()
+
+		while(1):
+			state = run_main()
+
+			if state == 0 :
+				print("This program will be shutting down in 5 seconds")
+				time.sleep(5)
+				end_sequence()
+				sys.exit()
+
+			elif state == -1:
+				break
+
+			else:
+				pass
