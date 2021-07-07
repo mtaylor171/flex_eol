@@ -323,10 +323,10 @@ int motor_ping(){
 	bcm2835_delay(10);
 	spiComs((DRV8343_IC1 << 8) | DRV8343_IC1_CONTROL);
 	if(spiIn[1] == 0x20){
-		return 0
+		return 0;
 	}
 	else{
-		return 1
+		return 1;
 	}
 }
 
