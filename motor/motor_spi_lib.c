@@ -286,22 +286,6 @@ uint16_t motor_register_read();
 
 struct timeval st, et;
 
-int initialize_adc(){
-	setAD5592Ch(0);
-	spiComs(AD5592_SW_RESET);
-	bcm2835_delay(1);
-	spiComs(0x1920);	//ADC gain 0-2Vref
-	bcm2835_delay(1);
-	spiComs(0x20FF); //Set all pins as ADC
-	analogInPins = 0xFF;
-	bcm2835_delay(1);
-	spiComs(0x5A00);	//Enable Internal reference
-	bcm2835_delay(1);
-	bcm2835_delay(LONG_DELAY);
-	
-	return 0;
-}
-
 uint32_t *main_script(int first_read){
 	time_t t;
 	//srand((uint32_t) time(&t));
@@ -344,6 +328,22 @@ int motor_ping(){
 	else{
 		return 1
 	}
+}
+
+int initialize_adc(){
+	setAD5592Ch(0);
+	spiComs(AD5592_SW_RESET);
+	bcm2835_delay(1);
+	spiComs(0x1920);	//ADC gain 0-2Vref
+	bcm2835_delay(1);
+	spiComs(0x20FF); //Set all pins as ADC
+	analogInPins = 0xFF;
+	bcm2835_delay(1);
+	spiComs(0x5A00);	//Enable Internal reference
+	bcm2835_delay(1);
+	bcm2835_delay(LONG_DELAY);
+	
+	return 0;
 }
 
 int initialize_motor(){

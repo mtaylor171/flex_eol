@@ -52,13 +52,14 @@ class MotorController(object):
         self.pwm_target = pwm_target
         
         ## Default values
-        self.pwm_current = 0
+        self.pwm_current = 4
         self.position_hold_time = 0
         self.position_counter = 0
         self.data = []
         self.data_single_revolution = []
         self.last_position = 0
         self.freq_count = [[],[]]
+        self.revolution_hold_time = 0
 
         self.kX1 = 0.0
         self.kV1 = 0.0
@@ -74,26 +75,28 @@ class MotorController(object):
         self.pi.hardware_PWM(19, 0, 0)
         GPIO.output(self.motor_pin, 1)
         _self_check = self.C_FUNCTIONS.initialize_motor()
-        
-        if _self_check:
+
+        if not _self_check:
+        	print("\nMotor Initialized Successfully\n")
+
+       	else:
             ## TODO Raise exception here
             msg = "ERROR: Could not communicate with motor board. Please disconnect motor."
             return 0, msg
-    	if 
+       		
         #if input("Would you like to view the registers? (y/n): ").lower() == 'y':
             #self._read_registers()
 
             #if(input("\nAre Registers correct? (y/n): ").lower() != 'y'):
                 #msg = "Registers Not Selected to be Correct."
                 #return 0, msg
-
         if not self.C_FUNCTIONS.initialize_adc():
-            print("ADC Initialized Successfuly")
+            print("\nADC Initialized Successfully\n")
         else:
             msg = "ERROR: ADC Initialize Failed. Please Disconnect motor."
             return 0, msg
 
-        return 1, "Everything Looks Good."
+        return 1, "Initialization complete!"
     
     def analog_in_initial_send(self):
         self.C_FUNCTIONS.getAnalogInAll_InitialSend()
@@ -102,7 +105,7 @@ class MotorController(object):
     # Gets called by run_main until preferred duty cycle is reached
     def pwm_control(self):
         if(self.pwm_current < self.pwm_target):
-            self.pwm_current = self.pwm_current + 1
+            self.pwm_current += 1
             print("PWM: {}".format(self.pwm_current))
         self.pi.hardware_PWM(19, 25000, pwm_current * 10000)
 
@@ -110,6 +113,7 @@ class MotorController(object):
     	self.C_FUNCTIONS.AD552_Init()
 
     def bcm2835_motor_ping(self):
+    	GPIO.output(self.motor_pin, 1)
     	return self.C_FUNCTIONS.motor_ping()
 
     def get_analog_data(self):
@@ -126,29 +130,31 @@ class MotorController(object):
             else:
                 code[i-1] = 0
         position = self._find_positions(code)	# Convert code into a position (1-6)
+
         if(self.last_position != position):		# Check if position is different from the last recorded position
             if(self.last_position != 0):
-                freq = self._get_rpm(self.position_hold_time)
-                self.running_filter(freq)
-                reluctance = self._motor_reluctance(self.x[-1])
                 self.position_counter += 1 
                 if(self.position_counter == 6):
-                    rms_val = self._revolution_rms()
+                	freq = self._get_rpm(self.revolution_hold_time)
+	                self.running_filter(freq)
+	                reluctance = self._motor_reluctance(self.x[-1])
+                    #rms_val = self._revolution_rms()
                     self.position_counter = 0
+                    self.revolution_hold_time = get_us()
                 else:
-                    rms_val = 0
-                print("Elapsed: {}, ".format(get_elapsed_us(self.INITIAL_US)) + "Position: {}, ".format(position) + "Frequency: {} ".format(round(freq, 2)) + "Filtered freq: {} ".format(x[-1]) +"PWM: {} ".format(pwm_current) + "Freq/PWM = {} ".format(reluctance) + "RMS Current: {}".format(rms_val))
+                    #rms_val = 0
+                #print("Elapsed: {}, ".format(get_elapsed_us(self.INITIAL_US)) + "Position: {}, ".format(position) + "Frequency: {} ".format(round(freq, 2)) + "Filtered freq: {} ".format(x[-1]) +"PWM: {} ".format(pwm_current) + "Freq/PWM = {} ".format(reluctance) + "RMS Current: {}".format(rms_val))
             else:
-            	print("Incorred position recorded")
-            	return 0
+            	msg = "INCORRECT POSITION RECORDED"
+            	return 0, msg
             self.position_hold_time = get_us()
             self.last_position = position
         else:
-            if((get_us() - self.position_hold_time) > 500000):
-                print("****WARNING: STALL DETECTED****") 
-                return 0
+            if((get_us() - self.position_hold_time) > 1000000):
+                msg = "STALL DETECTED"
+                return 0, msg
 
-        return 1
+        return 1, "All Good!"
 
     def running_filter(self, data):
         x_k = self.kX1 + kDt * self.kV1
@@ -183,17 +189,20 @@ class MotorController(object):
         # graph_data()
         #return 0
 
+	def killall(self):
+		self.pi.hardware_PWM(19, 0, 0)
+		GPIO.output(MC.motor_pin, 0)
 
     def motor_results(self, resp, msg):
-    print("\n\n-----------------------------\n")
-	print("-----------------------------\n")
-	if not resp:
-		print("MOTOR FAILED\n")
-		print(msg)
-	else:
-		print("MOTOR PASSED\n")
-	print("\n\n-----------------------------\n")
-	print("-----------------------------\n")
+	    print("\n\n-----------------------------\n")
+		print("-----------------------------\n")
+		if not resp:
+			print("MOTOR FAILED\n")
+			print(msg)
+		else:
+			print("MOTOR PASSED\n")
+		print("\n\n-----------------------------\n")
+		print("-----------------------------\n")
 
     def _read_registers(self):
     # Reads all registers on DRV8343 and prints them
@@ -220,9 +229,9 @@ class MotorController(object):
         else:
             return 0
     
-    def _get_rpm(self, pos_hold_time):
+    def _get_rpm(self, rev_hold_time):
 
-        freq = (1000000/((get_us() - pos_hold_time)*6))
+        freq = 60*( 1000000/(get_us() - rev_hold_time) )
         self.freq_count[0].append(get_elapsed_us(self.INITIAL_US))
         self.freq_count[1].append(freq)
         return freq
@@ -245,6 +254,7 @@ def start_sequence():
 	MC_start.bcm2835_init_spi()
 
 	print("Waiting on motor board to power up...\n")
+	print("NOTE: Hold CTRL + 'C' to exit program\n")
 
 	try:
 		while(MC_start.bcm2835_motor_ping()):
@@ -254,14 +264,15 @@ def start_sequence():
 		print("Motor Board Connected!")
 		print("\n*****************************\n")
 
+		return 1
+
 	except KeyboardInterrupt:
-		end_sequence()
+		end_sequence(MC_start)
 
+		return 0
 
-def end_sequence():
-    self.pi.hardware_PWM(19, 0, 0)
-    GPIO.output(self.motor_pin, 0)
-	sys.exit()
+def end_sequence(MC):
+	MC.killall()
 
 def run_motor(MC):
 	temp_data = np.uint32([0,0,0,0,0,0,0,0,0])
@@ -272,39 +283,46 @@ def run_motor(MC):
 	resp, msg = MC.initialize()
 	if not resp:
 		print(msg + "\n")
-		return -1
+		end_sequence(MC)
+		return -1, msg
 
 	MC.analog_in_initial_send()
 
-    MC.position_hold_time = get_us()
+    MC.position_hold_time = MC.revolution_hold_time = get_us()
 
     while(1):
-            if((pwm_counter % 1000) == 0):                              # Ramps up PWM
-                MC.pwm_control()
-            pwm_counter = pwm_counter + 1                               # Counter allows for a gradual ramp-up
+            if(MC.pwm_current < MC.pwm_target):                              # Ramps up PWM
+                if( (pwm_counter == 0) or ((pwm_counter % 1000) == 0) ):
+                	MC.pwm_control()
+                pwm_counter += 1
+
             for i in range(0, ACTIVE_CHANNELS):
                 data_16bit = MC.get_analog_data() 
                 adc_reading, index = data_process(data_16bit)
                 temp_data[index+1] = adc_reading
                 data[index+1].append(temp_data[index+1])
+
             temp_data[0] = get_elapsed_us(MC.INITIAL_US)
             data[0].append(temp_data[0])
             writer = csv.writer(file)
             writer.writerow(temp_data)
+
         try:
-            resp = MC.health_check(temp_data)
+            resp, msg = MC.health_check(temp_data)
             if not resp:
+            	MC.analog_terminate()
                 MC.shutdown()
-                return -1
+                return -1, msg
             if(temp_data[0] >= MC.duration * 1000000):
                 MC.analog_terminate()
                 MC.rampdown()
-                return 1
+                return 1, "Motor duration reached"
         except KeyboardInterrupt:
 
             MC.analog_terminate()
             MC.rampdown()
-            return -1
+            msg = "----Keyboard Interrupt by user----"
+            return -1, msg
 
         finally:
             pass
@@ -323,44 +341,58 @@ def run_main():
 
 	print("\n\n\n\n----PLEASE CONNECT MOTOR----\n\n\n")
 	
-	while(1):
-		if input("Once motor is connected please press 'y' and ENTER: ").lower() == 'y':
-			time.sleep(1)
-			break
-		else:
-			print("\n\n*****************************\n")
-			print("Incorrect character entered. ")
-			print("\n\n*****************************\n")
-			pass
+	try:
+		while(1):
+			if input("Once motor is connected please press 'y' and ENTER: ").lower() == 'y':
+				time.sleep(1)
+				break
+			else:
+				print("\n\n*****************************\n")
+				print("Incorrect character entered. ")
+				print("\n\n*****************************\n\n\n\n")
+				pass
 
-	print("\n\n*****************************\n")
-	print("\nCommunicating with board, please wait...\n")
+		print("\n\n*****************************\n")		
+		print("\n----Testing Mode 1----\n\n")
 
-	resp1, msg1 = run_motor(MC_1)
-	if resp1 < 0:
-		print(msg + "\n")
-		print("\n\nRestarting test program...\n\n")
-		return -1
-	resp2, msg2 = run_motor(MC_2)
-	if resp2 < 0:
-		print(msg + "\n")
-		print("\n\nRestarting test program...\n\n")
-		return -1
-	MC_1.motor_results(resp1, msg1)
-	MC_2.motor_results(resp2, msg2)
+		resp1, msg1 = run_motor(MC_1)
+		end_sequence(MC_1)
+		if resp1 < 0:
+			print(msg1 + "\n")
+			print("\n\nRestarting test program...\n\n")
+			return -1
 
-	while(1):
-		next_step = input("Press 'c' and ENTER to continue to next motor, or press 'x' and ENTER to exit program: ").lower()
-		if next_step == 'y':
-			time.sleep(1)
-			return 1
-		elif next_step == 'x':
-			return 0
-		else:
-			print("\n\n*****************************\n")
-			print("Incorrect character entered. ")
-			print("\n\n*****************************\n")
-			pass
+		print("\n\n*****************************\n")		
+		print("\n----Testing Mode 2----\n\n")
+
+		resp2, msg2 = run_motor(MC_2)
+		end_sequence(MC_2)
+		if resp2 < 0:
+			print(msg2 + "\n")
+			print("\n\nRestarting test program...\n\n")
+			return -1
+
+		MC_1.motor_results(resp1, msg1)
+		MC_2.motor_results(resp2, msg2)
+
+		while(1):
+			next_step = input("Press 'c' and ENTER to continue to next motor, or press 'x' and ENTER to exit program: ").lower()
+			if next_step == 'y':
+				time.sleep(1)
+				return 1
+			elif next_step == 'x':
+				end_sequence(MC_1)
+				end_sequence(MC_2)
+				return 0
+			else:
+				print("\n\n*****************************\n")
+				print("Incorrect character entered. ")
+				print("\n*****************************\n\n")
+				pass
+	except KeyboardInterrupt:
+		end_sequence(MC_1)
+		end_sequence(MC_2)
+		return 0
 
 
 def end_sequence():
@@ -368,15 +400,15 @@ def end_sequence():
 
 if __name__ == "__main__":
 	while(1):
-		start_sequence()
+		if !start_sequence():
+			sys.exit()
 
 		while(1):
 			state = run_main()
 
 			if state == 0 :
-				print("This program will be shutting down in 5 seconds")
-				time.sleep(5)
-				end_sequence()
+				print("This program will be shutting down in 3 seconds")
+				time.sleep(3)
 				sys.exit()
 
 			elif state == -1:
