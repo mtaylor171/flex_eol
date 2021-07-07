@@ -141,6 +141,8 @@ class MotorController(object):
                     #rms_val = self._revolution_rms()
                     self.position_counter = 0
                     self.revolution_hold_time = get_us()
+                    print('\033c')
+                    print("PWM: {}".format(self.pwm_current) + "RPM: {}".format(freq))
                 else:
                     rms_val = 0
                 #print("Elapsed: {}, ".format(get_elapsed_us(self.INITIAL_US)) + "Position: {}, ".format(position) + "Frequency: {} ".format(round(freq, 2)) + "Filtered freq: {} ".format(x[-1]) +"PWM: {} ".format(self.pwm_current) + "Freq/PWM = {} ".format(reluctance) + "RMS Current: {}".format(rms_val))
