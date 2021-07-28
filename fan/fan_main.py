@@ -71,7 +71,7 @@ class reader:
         self.pi.hardware_PWM(self.pwm, 25000, 0)
         self.pi.set_watchdog(self.gpio, 0)
         self._cb.cancel()
-        print('\033c')
+        
         print("*****************************")
         print("\nUser Cancelled\n")
         print("\nThis program will restart 3 seconds...\n")
@@ -99,6 +99,7 @@ def main():
     #DUTY = int(input("Enter Duty Cycle %: "))
     SAMPLE_TIME = 0.5
 
+    print('\033c')
     print("*****************************")
     print("\nNURO FAN TESTING\n")
     print("This test will run the fan at 95 percent for 300s")
