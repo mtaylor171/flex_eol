@@ -72,6 +72,16 @@ class reader:
         self.pi.set_watchdog(self.gpio, 0)
         self._cb.cancel() 
 
+def message_display(msg, desired_answer):
+    while(1):
+        if input(msg).lower() == desired_answer:
+            return 1
+        else:
+            print('\033c')
+            print("*****************************")
+            print("Incorrect character entered.")
+            print("*****************************")
+            return 0
 
 if __name__ == "__main__":
 
@@ -81,9 +91,20 @@ if __name__ == "__main__":
 
     RPM_GPIO = 4
     PWM_GPIO = 19
-    RUN_TIME = int(input("Enter Duration: "))
-    DUTY = int(input("Enter Duty Cycle %: "))
+    RUN_TIME = 300
+    DUTY = 95
+    #RUN_TIME = int(input("Enter Duration: "))
+    #DUTY = int(input("Enter Duty Cycle %: "))
     SAMPLE_TIME = 0.5
+
+    print("*****************************")
+    print("\nNURO FAN TESTING\n")
+    print("This test will run the fan at 95 percent for 300s")
+    print("To stop the test at anytime, hold 'CTRL + C'\n")
+    print("*****************************\n")
+
+    while(message_display("To begin testing, press '1' and ENTER: ", '1') != 1):
+        pass
 
     pi = pigpio.pi()
 
@@ -100,7 +121,8 @@ if __name__ == "__main__":
 
             RPM = p.RPM()
 
-            print("RPM = {}".format(int(RPM+0.5)))
+            print('\033c')
+            print("Time: {} ".format(time.time() - start) + "RPM = {}".format(int(RPM+0.5)) + " (Press CTRL + C to STOP")
         
         except KeyboardInterrupt:
             p.cancel()
