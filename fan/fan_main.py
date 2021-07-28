@@ -10,6 +10,7 @@ class reader:
         self.gpio = gpio
         self.pwm = pwm
         self.pulses_per_rev = pulses_per_rev
+        self.rpm_data = []
 
         if min_RPM > 1000.0:
             min_RPM = 1000.0
@@ -67,11 +68,21 @@ class reader:
                 RPM = 0.0
         return RPM
 
+    def calc_rpm(self):
+        temp_sum = 0
+        if(len(self.rpm_data == 0)):
+            return 0
+        else:
+            for i in range(0, len(self.rpm_data)):
+                temp_sum += self.rpm_data[i]
+            return temp_sum
+
+
+
     def cancel(self):
         self.pi.hardware_PWM(self.pwm, 25000, 0)
         self.pi.set_watchdog(self.gpio, 0)
         self._cb.cancel()
-        time.sleep(3)
 
 def message_display(msg, desired_answer):
     while(1):
@@ -118,6 +129,8 @@ def main():
             time.sleep(SAMPLE_TIME)
 
             RPM = p.RPM()
+            if((time.time() - start) > 30):
+                p.rpm_data.append(RPM)
 
             print('\033c')
             print("Time: {} ".format(round(time.time() - start), 1) + "RPM = {}".format(int(RPM+0.5)/2) + " (Press CTRL + C to STOP")
@@ -125,9 +138,10 @@ def main():
         except KeyboardInterrupt:
             print("*****************************")
             print("\nTest Cancelled\n")
-            print("\nThis program will restart 3 seconds...\n")
             print("*****************************")
             p.cancel()
+            rpm_avg = p.calc_rpm()
+            print(f"Average RPM of Test: {rpm_avg}")
             return 0
         
         finally:
@@ -138,6 +152,9 @@ def main():
     print("\nThis program will restart 3 seconds...\n")
     print("*****************************")
     p.cancel()
+    rpm_avg = p.calc_rpm()
+    print(f"Average RPM of Test: {rpm_avg}")
+    return 0
 
 if __name__ == "__main__":
     
@@ -147,3 +164,5 @@ if __name__ == "__main__":
     
     while(1):
         main()
+        while(message_display("To continue, press '2' and ENTER: ", '2') != 1):
+            pass
