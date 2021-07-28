@@ -75,7 +75,7 @@ class reader:
         else:
             for i in range(0, len(self.rpm_data)):
                 temp_sum += self.rpm_data[i]
-            return temp_sum
+            return ((temp_sum/2)/(len(self.rpm_data) - 1))
 
 
 
