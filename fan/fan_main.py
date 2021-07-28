@@ -71,6 +71,11 @@ class reader:
         self.pi.hardware_PWM(self.pwm, 25000, 0)
         self.pi.set_watchdog(self.gpio, 0)
         self._cb.cancel() 
+        print("*****************************")
+        print("\nUser Cancelled\n")
+        print("\nThis program will shut down in 3 seconds...\n")
+        print("*****************************")
+        time.sleep(3)
 
 def message_display(msg, desired_answer):
     while(1):
