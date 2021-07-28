@@ -70,10 +70,11 @@ class reader:
     def cancel(self):
         self.pi.hardware_PWM(self.pwm, 25000, 0)
         self.pi.set_watchdog(self.gpio, 0)
-        self._cb.cancel() 
+        self._cb.cancel()
+        print('\033c')
         print("*****************************")
         print("\nUser Cancelled\n")
-        print("\nThis program will shut down in 3 seconds...\n")
+        print("\nThis program will restart 3 seconds...\n")
         print("*****************************")
         time.sleep(3)
 
@@ -88,11 +89,7 @@ def message_display(msg, desired_answer):
             print("*****************************")
             return 0
 
-if __name__ == "__main__":
-
-    import time
-    import pigpio
-    import fan_main
+def main():
 
     RPM_GPIO = 4
     PWM_GPIO = 19
@@ -127,15 +124,22 @@ if __name__ == "__main__":
             RPM = p.RPM()
 
             print('\033c')
-            print("Time: {} ".format(time.time() - start) + "RPM = {}".format(int(RPM+0.5)) + " (Press CTRL + C to STOP")
+            print("Time: {} ".format(round(time.time() - start), 1) + "RPM = {}".format(int(RPM+0.5)) + " (Press CTRL + C to STOP")
         
         except KeyboardInterrupt:
             p.cancel()
-            sys.exit()
+            return 0
         
         finally:
             pass
 
     p.cancel()
 
-    #p.stop()
+if __name__ == "__main__":
+    
+    import time
+    import pigpio
+    import fan_main
+    
+    while(1):
+        main()
