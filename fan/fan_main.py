@@ -70,7 +70,7 @@ class reader:
 
     def calc_rpm(self):
         temp_sum = 0
-        if(len(self.rpm_data == 0)):
+        if(len(self.rpm_data) ==0):
             return 0
         else:
             for i in range(0, len(self.rpm_data)):
