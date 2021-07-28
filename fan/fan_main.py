@@ -71,11 +71,6 @@ class reader:
         self.pi.hardware_PWM(self.pwm, 25000, 0)
         self.pi.set_watchdog(self.gpio, 0)
         self._cb.cancel()
-        
-        print("*****************************")
-        print("\nUser Cancelled\n")
-        print("\nThis program will restart 3 seconds...\n")
-        print("*****************************")
         time.sleep(3)
 
 def message_display(msg, desired_answer):
@@ -93,7 +88,7 @@ def main():
 
     RPM_GPIO = 4
     PWM_GPIO = 19
-    RUN_TIME = 300
+    RUN_TIME = 200
     DUTY = 95
     #RUN_TIME = int(input("Enter Duration: "))
     #DUTY = int(input("Enter Duty Cycle %: "))
@@ -125,15 +120,23 @@ def main():
             RPM = p.RPM()
 
             print('\033c')
-            print("Time: {} ".format(round(time.time() - start), 1) + "RPM = {}".format(int(RPM+0.5)) + " (Press CTRL + C to STOP")
+            print("Time: {} ".format(round(time.time() - start), 1) + "RPM = {}".format(int(RPM+0.5)/2) + " (Press CTRL + C to STOP")
         
         except KeyboardInterrupt:
+            print("*****************************")
+            print("\nTest Cancelled\n")
+            print("\nThis program will restart 3 seconds...\n")
+            print("*****************************")
             p.cancel()
             return 0
         
         finally:
             pass
-
+            
+    print("*****************************")
+    print("\nTest Duration Reached\n")
+    print("\nThis program will restart 3 seconds...\n")
+    print("*****************************")
     p.cancel()
 
 if __name__ == "__main__":
